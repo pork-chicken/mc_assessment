@@ -46,6 +46,26 @@ const airDropSol = async (wallet, amount) => {
   }
 };
 
+const getTransferFee = async (from, to, amount) => {
+  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+  let blockhash = (await connection.getLatestBlockhash("finalized")).blockhash;
+  const transaction = new Transaction().add(
+    SystemProgram.transfer({
+      fromPubkey: from.publicKey,
+      toPubkey: to.publicKey,
+      lamports: amount * LAMPORTS_PER_SOL,
+    })
+  );
+  transaction.feePayer = from.publicKey;
+  transaction.recentBlockhash = blockhash;
+  const response = await connection.getFeeForMessage(
+    transaction.compileMessage(),
+    "confirmed"
+  );
+  const fee = response.value / LAMPORTS_PER_SOL;
+  return fee;
+};
+
 const transferSol = async (from, to, amount) => {
   console.log(
     `[SEND] from: ${from.publicKey.toString()}, to: ${to.publicKey.toString()}, amount: ${amount}`
@@ -66,4 +86,4 @@ const transferSol = async (from, to, amount) => {
   return signature;
 };
 
-export { getWalletBalance, airDropSol, transferSol };
+export { getWalletBalance, airDropSol, transferSol, getTransferFee };

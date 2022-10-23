@@ -8,7 +8,7 @@ import {
   Keypair
 } from "@solana/web3.js";
 import {useEffect , useState } from "react";
-import {getWalletBalance, airDropSol, transferSol} from "./util.js";
+import {getWalletBalance, airDropSol, transferSol, getTransferFee} from "./util.js";
 import {Buffer} from "buffer";
 window.Buffer = Buffer;
 
@@ -100,7 +100,10 @@ function App() {
         const amount = await getWalletBalance(response);
         console.log('amount ', amount);
         setWallet(response);
-        setMessage(`Connected to ${response.publicKey.toString()}, amount: ${amount}`);
+        setMessage(`
+          Connected to ${response.publicKey.toString()}
+          Amount: ${amount}
+        `);
       } catch (err) {
       // { code: 4001, message: 'User rejected the request.' }
       }
@@ -127,15 +130,26 @@ function App() {
     const amount = await getWalletBalance(sender);
     console.log('amount ', amount);
     setSenderWallet(sender);
-    setMessage(`Set up ${sender.publicKey.toString()}, amount: ${amount}`);
+    setMessage(`
+      Set up ${sender.publicKey.toString()}
+      Amount: ${amount}
+    `);
   }
 
   const transferSolToWallet = async () => {
-    const gas = 0.005;
+    const fee = await getTransferFee(senderWallet, wallet, 2);
+    console.log(`fee: ${fee}`);
     const prevAmount = await getWalletBalance(wallet);
-    await transferSol(senderWallet, wallet, 2 - gas);
+    await transferSol(senderWallet, wallet, 2 - fee);
     const amount = await getWalletBalance(wallet);
-    setMessage(`Sol amount: ${prevAmount} => ${amount}`);
+    setMessage(`
+      Sol transfered.
+      From: ${senderWallet?.publicKey.toString()}
+      To: ${wallet?.publicKey.toString()}
+      Fee: ${fee}
+      Amount: ${2-fee}
+      Receiver balance: ${prevAmount} => ${amount}
+    `);
   }
 
   // HTML code for the app
@@ -146,7 +160,9 @@ function App() {
       </header>
       {message && (
         <>
-          <p>{message}</p>
+          <p style={{
+            whiteSpace: "pre-wrap",
+          }}>{message}</p>
           <hr/>
         </>
       )}
