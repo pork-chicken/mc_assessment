@@ -5,8 +5,12 @@ import './App.css';
 import {
   PublicKey,
   Transaction,
+  Keypair
 } from "@solana/web3.js";
 import {useEffect , useState } from "react";
+import {getWalletBalance, airDropSol, transferSol} from "./util.js";
+import {Buffer} from "buffer";
+window.Buffer = Buffer;
 
 // create types
 type DisplayEncoding = "utf8" | "hex";
@@ -57,8 +61,16 @@ function App() {
   );
 
 	// create state variable for the wallet key
-  const [walletKey, setWalletKey] = useState<string | undefined>(
-  undefined
+  const [wallet, setWallet] = useState<Keypair | undefined>(
+    undefined
+  );
+
+  const [senderWallet, setSenderWallet] = useState<Keypair | undefined>(
+    undefined
+  );
+
+  const [message, setMessage] = useState<String | undefined>(
+    undefined
   );
 
   // this is the function that runs whenever the component updates (e.g. render, refresh)
@@ -85,7 +97,10 @@ function App() {
         const response = await solana.connect();
         console.log('wallet account ', response.publicKey.toString());
 				// update walletKey to be the public key
-        setWalletKey(response.publicKey.toString());
+        const amount = await getWalletBalance(response);
+        console.log('amount ', amount);
+        setWallet(response);
+        setMessage(`Connected to ${response.publicKey.toString()}, amount: ${amount}`);
       } catch (err) {
       // { code: 4001, message: 'User rejected the request.' }
       }
@@ -98,20 +113,75 @@ function App() {
     if (solana) {
       try {
         const response = await solana.disconnect();
-        setWalletKey(undefined);
+        setWallet(undefined);
+        setMessage("Wallet disconnected");
       } catch (err) {
       // { code: 4001, message: 'User rejected the request.' }
       }
     }
   };
 
-	// HTML code for the app
+  const setupSender = async () => {
+    const sender = Keypair.generate();
+    await airDropSol(sender, 2);
+    const amount = await getWalletBalance(sender);
+    console.log('amount ', amount);
+    setSenderWallet(sender);
+    setMessage(`Set up ${sender.publicKey.toString()}, amount: ${amount}`);
+  }
+
+  const transferSolToWallet = async () => {
+    const gas = 0.005;
+    const prevAmount = await getWalletBalance(wallet);
+    await transferSol(senderWallet, wallet, 2 - gas);
+    const amount = await getWalletBalance(wallet);
+    setMessage(`Sol amount: ${prevAmount} => ${amount}`);
+  }
+
+  // HTML code for the app
   return (
     <div className="App">
       <header className="App-header">
         <h2>Connect to Phantom Wallet</h2>
       </header>
-      {provider && !walletKey && (
+      {message && (
+        <>
+          <p>{message}</p>
+          <hr/>
+        </>
+      )}
+      {!senderWallet && (
+        <button
+          style={{
+            fontSize: "16px",
+            padding: "15px",
+            fontWeight: "bold",
+            borderRadius: "5px",
+          }}
+          onClick={setupSender}
+        >
+          Create a new Solana account
+        </button>
+      )}
+      {senderWallet && (
+        <p>Sender: {senderWallet.publicKey.toString()}</p>
+      )}
+      {provider && senderWallet && !wallet && (
+        <button
+          style={{
+            fontSize: "16px",
+            padding: "15px",
+            fontWeight: "bold",
+            borderRadius: "5px",
+          }}
+          onClick={connectWallet}
+        >
+          Connect Wallet
+        </button>
+      )}
+      {provider && senderWallet && wallet && (
+        <>
+          <p>Connected: {wallet.publicKey.toString()}</p>
           <button
             style={{
               fontSize: "16px",
@@ -119,33 +189,28 @@ function App() {
               fontWeight: "bold",
               borderRadius: "5px",
             }}
-            onClick={connectWallet}
+            onClick={transferSolToWallet}
           >
-            Connect Wallet
+            Transfer to new wallet
           </button>
-        )}
-        {provider && walletKey && (
-          <>
-            <p>Connected: {walletKey}</p>
-            <button
-              style={{
-                fontSize: "16px",
-                padding: "15px",
-                fontWeight: "bold",
-                borderRadius: "5px",
-              }}
-              onClick={disconnectWallet}
-            >
-              Disonnect
-            </button>
-          </>
-        )}
-        {!provider && (
-          <p>
-            No provider found. Install{" "}
-            <a href="https://phantom.app/">Phantom Browser extension</a>
-          </p>
-        )}
+          <button
+            style={{
+              fontSize: "16px",
+              padding: "15px",
+              borderRadius: "5px",
+            }}
+            onClick={disconnectWallet}
+          >
+            Disonnect
+          </button>
+        </>
+      )}
+      {!provider && (
+        <p>
+          No provider found. Install{" "}
+          <a href="https://phantom.app/">Phantom Browser extension</a>
+        </p>
+      )}
     </div>
   );
 }
